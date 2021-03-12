@@ -548,7 +548,7 @@
   ([dashboard                   :- su/Map
     param-key                   :- su/NonBlankString
     constraint-param-key->value :- su/Map
-    prefix                      :- (s/maybe su/NonBlankString)]
+    query                       :- (s/maybe su/NonBlankString)]
    (let [dashboard (hydrate dashboard :resolved-params)]
      (when-not (get (:resolved-params dashboard) param-key)
        (throw (ex-info (tru "Dashboard does not have a parameter with the ID {0}" (pr-str param-key))
@@ -561,8 +561,8 @@
        ;; TODO - we should combine these all into a single UNION ALL query against the data warehouse instead of doing a
        ;; separate query for each Field (for parameters that are mapped to more than one Field)
        (try
-         (let [results (distinct (mapcat (if (seq prefix)
-                                           #(chain-filter/chain-filter-search % constraints prefix)
+         (let [results (distinct (mapcat (if (seq query)
+                                           #(chain-filter/chain-filter-search % constraints query)
                                            #(chain-filter/chain-filter % constraints))
                                          field-ids))]
            ;; results can come back as [v ...] *or* as [[orig remapped] ...]. Sort by remapped value if that's the case
@@ -584,16 +584,16 @@
   (let [dashboard (api/read-check Dashboard id)]
     (chain-filter dashboard param-key query-params)))
 
-(api/defendpoint GET "/:id/params/:param-key/search/:prefix"
-  "Fetch possible values of the parameter whose ID is `:param-key` that start with with `:prefix`. Optionally restrict
+(api/defendpoint GET "/:id/params/:param-key/search/:query"
+  "Fetch possible values of the parameter whose ID is `:param-key` that contain `:query`. Optionally restrict
   these values by passing query parameters like `other-parameter=value` e.g.
 
-    ;; fetch values for Dashboard 1 parameter 'abc' that start with 'Cam' and are possible when parameter 'def' is set
+    ;; fetch values for Dashboard 1 parameter 'abc' that contain 'Cam' and are possible when parameter 'def' is set
     ;; to 100
      GET /api/dashboard/1/params/abc/search/Cam?def=100"
-  [id param-key prefix :as {:keys [query-params]}]
+  [id param-key query :as {:keys [query-params]}]
   (let [dashboard (api/read-check Dashboard id)]
-    (chain-filter dashboard param-key query-params prefix)))
+    (chain-filter dashboard param-key query-params query)))
 
 (api/defendpoint GET "/params/valid-filter-fields"
   "Utility endpoint for powering Dashboard UI. Given some set of `filtered` Field IDs (presumably Fields used in
